@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Tooling caches / build artifacts
+.vite/
+dist/
+build/
+
+# Local environment files
+.env
+.env.*
+
