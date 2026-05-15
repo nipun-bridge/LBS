@@ -66,15 +66,15 @@ export default function AppShell({ children, title = "Leads", activeNav, onNavig
           ) : null}
 
           <Stack spacing={0.5} sx={{ minWidth: 240 }}>
-            <Breadcrumbs aria-label="breadcrumb" sx={{ color: "text.secondary" }}>
-              <Typography variant="body2" color="text.secondary">
-                Home
-              </Typography>
-              <Typography variant="body2" color="text.primary" fontWeight={600}>
-                {title}
-              </Typography>
-            </Breadcrumbs>
-          </Stack>
+              <Breadcrumbs aria-label="breadcrumb" sx={{ color: "text.secondary" }}>
+                <Typography variant="body2" color="text.secondary">
+                  Home
+                </Typography>
+                <Typography variant="body2" color="text.primary" fontWeight={600}>
+                  {title}
+                </Typography>
+              </Breadcrumbs>
+            </Stack>
 
           <Box sx={{ flex: 1 }} />
 

@@ -69,3 +69,7 @@ export function getMockLeads(count = 10) {
   });
 }
 
+export function getMockLeadById(leadId) {
+  const all = getMockLeads(30);
+  return all.find((l) => l.id === leadId) || null;
+}

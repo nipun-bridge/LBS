@@ -20,6 +20,7 @@ import {
   Typography
 } from "@mui/material";
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getMockLeads } from "../data/mockLeads.js";
 
 function formatCreatedAt(iso) {
@@ -41,6 +42,7 @@ function formatCreatedAt(iso) {
 const PAGE_SIZE = 10;
 
 export default function LeadsPage() {
+  const navigate = useNavigate();
   const allLeads = useMemo(() => getMockLeads(30), []);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -132,7 +134,15 @@ export default function LeadsPage() {
             </TableHead>
             <TableBody>
               {pageRows.map((row) => (
-                <TableRow key={row.id} hover sx={{ "& td": { py: 1.5 } }}>
+                <TableRow
+                  key={row.id}
+                  hover
+                  onClick={() => navigate(`/leads/${encodeURIComponent(row.id)}`)}
+                  sx={{
+                    "& td": { py: 1.5 },
+                    cursor: "pointer"
+                  }}
+                >
                   <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{row.id}</TableCell>
                   <TableCell sx={{ fontWeight: 500 }}>{row.name}</TableCell>
                   <TableCell sx={{ color: "text.secondary" }}>{row.phone}</TableCell>
@@ -159,7 +169,10 @@ export default function LeadsPage() {
                       component="button"
                       underline="none"
                       sx={{ fontSize: 12, fontWeight: 600 }}
-                      onClick={() => {}}
+                      onClick={(e) => {
+                        // Clicking action should not navigate to details.
+                        e.stopPropagation();
+                      }}
                     >
                       {row.action}
                     </Link>
@@ -231,4 +244,3 @@ export default function LeadsPage() {
     </Stack>
   );
 }
-
