@@ -15,6 +15,7 @@ import {
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getMockLeadById } from "../data/mockLeads.js";
+import NearbySnfMap from "../components/NearbySnfMap.jsx";
 
 const TABS = [
   "General",
@@ -120,6 +121,7 @@ export default function LeadDetailsPage() {
   }, [fullName]);
 
   const address = useMemo(() => buildAddressFromGeneral(general), [general]);
+  const geoapifyTileKey = import.meta.env.VITE_GEOAPIFY_API_KEY;
 
   async function onFindNearbySnfs() {
     if (!address) return;
@@ -342,59 +344,103 @@ export default function LeadDetailsPage() {
               </Button>
             </Stack>
 
-            {!address ? (
-              <Alert severity="warning">No address found for this lead.</Alert>
-            ) : (
-              <Typography variant="caption" color="text.secondary">
-                Using address: <strong>{address}</strong>
-              </Typography>
-            )}
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <Stack spacing={1}>
+                  {!address ? (
+                    <Alert severity="warning">No address found for this lead.</Alert>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">
+                      Using address: <strong>{address}</strong>
+                    </Typography>
+                  )}
 
-            {snfError ? <Alert severity="error">{snfError}</Alert> : null}
+                  {snfError ? <Alert severity="error">{snfError}</Alert> : null}
 
-            {snfLoading ? (
-              <Stack direction="row" spacing={1.5} alignItems="center">
-                <CircularProgress size={18} />
-                <Typography variant="body2">Searching nearby SNFs…</Typography>
-              </Stack>
-            ) : null}
-
-            {snfGeocode ? (
-              <Alert severity="info">
-                Resolved: <strong>{snfGeocode.normalizedAddress || snfGeocode.query}</strong> (
-                {snfGeocode.lat}, {snfGeocode.lng})
-              </Alert>
-            ) : null}
-
-            {snfResults.length === 0 && !snfLoading && !snfError ? (
-              <Typography color="text.secondary">No results found.</Typography>
-            ) : (
-              <Stack spacing={1}>
-                {snfResults.map((r, idx) => (
-                  <Paper
-                    key={r.id || `${r.lat},${r.lng}-${idx}`}
-                    variant="outlined"
-                    sx={{ p: 1.25, borderRadius: 2, borderColor: "divider" }}
-                  >
-                    <Stack spacing={0.25}>
-                      <Typography fontWeight={700} sx={{ fontSize: 13 }}>
-                        {r.name || "Unnamed facility"}{" "}
-                        <Typography
-                          component="span"
-                          color="text.secondary"
-                          sx={{ fontSize: 12, fontWeight: 500 }}
-                        >
-                          {r.distanceMeters != null ? `— ${formatDistance(r.distanceMeters)}` : ""}
-                        </Typography>
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {r.formattedAddress || `${r.lat}, ${r.lng}`}
-                      </Typography>
+                  {snfLoading ? (
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <CircularProgress size={18} />
+                      <Typography variant="body2">Searching nearby SNFs…</Typography>
                     </Stack>
-                  </Paper>
-                ))}
-              </Stack>
-            )}
+                  ) : null}
+
+                  {snfGeocode ? (
+                    <Alert severity="info">
+                      Resolved:{" "}
+                      <strong>{snfGeocode.normalizedAddress || snfGeocode.query}</strong> (
+                      {snfGeocode.lat}, {snfGeocode.lng})
+                    </Alert>
+                  ) : null}
+
+                  {snfResults.length === 0 && !snfLoading && !snfError ? (
+                    <Typography color="text.secondary">No results found.</Typography>
+                  ) : (
+                    <Stack spacing={1}>
+                      {snfResults.map((r, idx) => (
+                        <Paper
+                          key={r.id || `${r.lat},${r.lng}-${idx}`}
+                          variant="outlined"
+                          sx={{ p: 1.25, borderRadius: 2, borderColor: "divider" }}
+                        >
+                          <Stack spacing={0.25}>
+                            <Typography fontWeight={700} sx={{ fontSize: 13 }}>
+                              {r.name || "Unnamed facility"}{" "}
+                              <Typography
+                                component="span"
+                                color="text.secondary"
+                                sx={{ fontSize: 12, fontWeight: 500 }}
+                              >
+                                {r.distanceMeters != null
+                                  ? `— ${formatDistance(r.distanceMeters)}`
+                                  : ""}
+                              </Typography>
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {r.formattedAddress || `${r.lat}, ${r.lng}`}
+                            </Typography>
+                          </Stack>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  )}
+                </Stack>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Box sx={{ pr: { xs: 0, md: 1 } }}>
+                  {!geoapifyTileKey ? (
+                    <Alert severity="warning">
+                      Missing <code>VITE_GEOAPIFY_API_KEY</code> for map tiles. Add it to your client
+                      env and restart dev server.
+                    </Alert>
+                  ) : snfGeocode ? (
+                    <NearbySnfMap
+                      apiKey={geoapifyTileKey}
+                      center={{ lat: snfGeocode.lat, lng: snfGeocode.lng }}
+                      radiusMeters={5000}
+                      snfs={snfResults}
+                    />
+                  ) : (
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        height: 420,
+                        borderRadius: 2,
+                        borderColor: "divider",
+                        bgcolor: "#F8FAFC",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}
+                    >
+                      <Typography color="text.secondary">
+                        Map will appear after geocoding.
+                      </Typography>
+                    </Paper>
+                  )}
+                </Box>
+              </Grid>
+            </Grid>
           </Stack>
         </Paper>
       ) : null}

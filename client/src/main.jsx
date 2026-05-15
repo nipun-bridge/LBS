@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
+import "leaflet/dist/leaflet.css";
 
 const theme = createTheme({
   typography: {
