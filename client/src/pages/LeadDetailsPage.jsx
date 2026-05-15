@@ -1,7 +1,9 @@
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import {
+  Alert,
   Box,
   Button,
+  CircularProgress,
   Divider,
   Grid,
   Paper,
@@ -60,10 +62,36 @@ function relativeTimeFrom(iso) {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
+function formatDistance(meters) {
+  if (!Number.isFinite(meters)) return "";
+  const km = meters / 1000;
+  if (km < 1) return `${Math.round(meters)} m`;
+  return `${km.toFixed(2)} km`;
+}
+
+function buildAddressFromGeneral(general) {
+  const parts = [
+    general?.address1,
+    general?.address2,
+    general?.city,
+    general?.state,
+    general?.zip
+  ]
+    .map((p) => String(p || "").trim())
+    .filter(Boolean);
+
+  return parts.join(", ");
+}
+
 export default function LeadDetailsPage() {
   const { leadId } = useParams();
   const lead = useMemo(() => getMockLeadById(leadId), [leadId]);
   const [tab, setTab] = useState(0);
+  const [snfLoading, setSnfLoading] = useState(false);
+  const [snfError, setSnfError] = useState(null);
+  const [snfGeocode, setSnfGeocode] = useState(null);
+  const [snfResults, setSnfResults] = useState([]);
+  const [snfVisible, setSnfVisible] = useState(false);
 
   const fullName = useMemo(() => (lead?.name ? toTitleCase(lead.name) : leadId), [lead, leadId]);
 
@@ -91,6 +119,60 @@ export default function LeadDetailsPage() {
     };
   }, [fullName]);
 
+  const address = useMemo(() => buildAddressFromGeneral(general), [general]);
+
+  async function onFindNearbySnfs() {
+    if (!address) return;
+    setSnfVisible(true);
+    setSnfError(null);
+    setSnfResults([]);
+    setSnfGeocode(null);
+
+    setSnfLoading(true);
+    try {
+      const geocodeResp = await fetch("/api/geocode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address })
+      });
+      const geocodeJson = await geocodeResp.json().catch(() => ({}));
+      if (!geocodeResp.ok) {
+        throw new Error(geocodeJson?.error || "Geocoding failed");
+      }
+
+      setSnfGeocode(geocodeJson);
+
+      const nearbyUrl = new URL("/api/nearby", window.location.origin);
+      nearbyUrl.searchParams.set("lat", String(geocodeJson.lat));
+      nearbyUrl.searchParams.set("lng", String(geocodeJson.lng));
+      nearbyUrl.searchParams.set("radiusMeters", String(5000));
+      nearbyUrl.searchParams.set("limit", String(10));
+      // Option A: try a more specific category for SNF / nursing home.
+      nearbyUrl.searchParams.set("categories", "healthcare.nursing_home");
+
+      let nearbyResp = await fetch(nearbyUrl);
+      let nearbyJson = await nearbyResp.json().catch(() => ({}));
+
+      // If category is too narrow or unsupported, fall back to broader healthcare.
+      if (!nearbyResp.ok || !Array.isArray(nearbyJson.results) || nearbyJson.results.length === 0) {
+        const fallbackUrl = new URL(nearbyUrl);
+        fallbackUrl.searchParams.set("categories", "healthcare");
+        nearbyResp = await fetch(fallbackUrl);
+        nearbyJson = await nearbyResp.json().catch(() => ({}));
+      }
+
+      if (!nearbyResp.ok) {
+        throw new Error(nearbyJson?.error || "Nearby search failed");
+      }
+
+      setSnfResults(Array.isArray(nearbyJson.results) ? nearbyJson.results : []);
+    } catch (err) {
+      setSnfError(err?.message || "Something went wrong");
+    } finally {
+      setSnfLoading(false);
+    }
+  }
+
   return (
     <Stack spacing={1.5}>
       <Paper
@@ -112,14 +194,25 @@ export default function LeadDetailsPage() {
                 {lead?.id || leadId} • Created {relativeTimeFrom(lead?.createdAt)} by Sarah Chen
               </Typography>
             </Box>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<EditOutlinedIcon fontSize="small" />}
-              sx={{ textTransform: "none", borderRadius: 2 }}
-            >
-              Edit
-            </Button>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button
+                variant="contained"
+                size="small"
+                onClick={onFindNearbySnfs}
+                disabled={!address || snfLoading}
+                sx={{ textTransform: "none", borderRadius: 2 }}
+              >
+                Find nearby SNFs
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<EditOutlinedIcon fontSize="small" />}
+                sx={{ textTransform: "none", borderRadius: 2 }}
+              >
+                Edit
+              </Button>
+            </Stack>
           </Stack>
         </Box>
 
@@ -224,7 +317,87 @@ export default function LeadDetailsPage() {
           </Box>
         )}
       </Paper>
+
+      {tab === 0 && snfVisible ? (
+        <Paper
+          variant="outlined"
+          sx={{
+            borderRadius: 2,
+            bgcolor: "#FFFFFF",
+            borderColor: "divider",
+            p: 2
+          }}
+        >
+          <Stack spacing={1}>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Typography fontWeight={800}>Nearby SNFs</Typography>
+              <Box sx={{ flex: 1 }} />
+              <Button
+                size="small"
+                variant="text"
+                onClick={() => setSnfVisible(false)}
+                sx={{ textTransform: "none" }}
+              >
+                Hide
+              </Button>
+            </Stack>
+
+            {!address ? (
+              <Alert severity="warning">No address found for this lead.</Alert>
+            ) : (
+              <Typography variant="caption" color="text.secondary">
+                Using address: <strong>{address}</strong>
+              </Typography>
+            )}
+
+            {snfError ? <Alert severity="error">{snfError}</Alert> : null}
+
+            {snfLoading ? (
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <CircularProgress size={18} />
+                <Typography variant="body2">Searching nearby SNFs…</Typography>
+              </Stack>
+            ) : null}
+
+            {snfGeocode ? (
+              <Alert severity="info">
+                Resolved: <strong>{snfGeocode.normalizedAddress || snfGeocode.query}</strong> (
+                {snfGeocode.lat}, {snfGeocode.lng})
+              </Alert>
+            ) : null}
+
+            {snfResults.length === 0 && !snfLoading && !snfError ? (
+              <Typography color="text.secondary">No results found.</Typography>
+            ) : (
+              <Stack spacing={1}>
+                {snfResults.map((r, idx) => (
+                  <Paper
+                    key={r.id || `${r.lat},${r.lng}-${idx}`}
+                    variant="outlined"
+                    sx={{ p: 1.25, borderRadius: 2, borderColor: "divider" }}
+                  >
+                    <Stack spacing={0.25}>
+                      <Typography fontWeight={700} sx={{ fontSize: 13 }}>
+                        {r.name || "Unnamed facility"}{" "}
+                        <Typography
+                          component="span"
+                          color="text.secondary"
+                          sx={{ fontSize: 12, fontWeight: 500 }}
+                        >
+                          {r.distanceMeters != null ? `— ${formatDistance(r.distanceMeters)}` : ""}
+                        </Typography>
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {r.formattedAddress || `${r.lat}, ${r.lng}`}
+                      </Typography>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
+          </Stack>
+        </Paper>
+      ) : null}
     </Stack>
   );
 }
-
