@@ -1,0 +1,13 @@
+{
+  "name": "location-based-service-demo",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "npm -w server run dev & npm -w client run dev",
+    "lint": "npm -w client run lint && npm -w server run lint"
+  }
+}
+
